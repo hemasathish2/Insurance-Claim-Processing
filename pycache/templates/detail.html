@@ -1,0 +1,350 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="page-heading">
+    <span class="eyebrow">CLAIM DETAILS</span>
+
+    <h1>{{ claim.id }}</h1>
+
+    <p>
+        <span class="pill">{{ claim.status }}</span>
+        &nbsp;
+        {{ claim.service_class }} service class
+    </p>
+</div>
+
+<div class="two-col">
+
+    <!-- CLAIM INFORMATION -->
+    <section class="panel">
+        <h2>Claim information</h2>
+
+        <dl>
+            <dt>Claimant</dt>
+            <dd>{{ claim.claimant }}</dd>
+
+            <dt>Policy number</dt>
+            <dd>{{ claim.policy_number }}</dd>
+
+            <dt>Incident date</dt>
+            <dd>{{ claim.incident_date }}</dd>
+
+            <dt>Claim amount</dt>
+            <dd>₹{{ '%.2f'|format(claim.amount) }}</dd>
+
+            <dt>Category</dt>
+            <dd>{{ claim.category }}</dd>
+
+            <dt>Document</dt>
+            <dd>
+                {% if claim.filename %}
+                    Uploaded (stored locally)
+                {% else %}
+                    Missing — review required
+                {% endif %}
+            </dd>
+        </dl>
+    </section>
+
+    <!-- SIX RULE ELIGIBILITY CHECK -->
+    <section class="panel">
+
+        <h2>Six-rule eligibility check</h2>
+
+        <p class="muted">
+            Enter demonstration policy settings manually.
+            No live insurer database is connected.
+        </p>
+
+        {% if claim.status != 'PAYOUT_QUEUED' %}
+
+        <form method="post"
+              action="{{ url_for('run_rules', claim_id=claim.id) }}">
+
+            <label>
+                Policy active on incident date?
+
+                <select name="policy_active">
+                    <option value="no">
+                        Unknown / No
+                    </option>
+
+                    <option value="yes">
+                        Yes (demo verification)
+                    </option>
+                </select>
+            </label>
+
+            <label>
+                Claim category covered?
+
+                <select name="covered">
+                    <option value="no">
+                        Unknown / No
+                    </option>
+
+                    <option value="yes">
+                        Yes (demo verification)
+                    </option>
+                </select>
+            </label>
+
+            <label>
+                Policy limit (INR)
+
+                <input
+                    name="policy_limit"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="25000"
+                    required
+                >
+            </label>
+
+            <label>
+                Reporting window (days)
+
+                <input
+                    name="reporting_window_days"
+                    type="number"
+                    min="0"
+                    value="365"
+                    required
+                >
+            </label>
+
+            <button class="btn" type="submit">
+                Run R1–R6 checks
+            </button>
+
+        </form>
+
+        {% else %}
+
+        <p class="notice">
+            Demo payout has already been queued.
+            Eligibility checks are locked.
+        </p>
+
+        {% endif %}
+
+    </section>
+
+</div>
+
+
+<!-- RULE RESULTS -->
+{% if rules %}
+
+<section class="panel">
+
+    <h2>Rule-by-rule decision</h2>
+
+    <div class="scroll">
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Rule</th>
+                    <th>Check</th>
+                    <th>Result</th>
+                    <th>Explanation</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for r in rules %}
+
+                <tr>
+                    <td>{{ r.code }}</td>
+
+                    <td>{{ r.name }}</td>
+
+                    <td>
+                        <span class="pill {{ 'pass' if r.passed else 'fail' }}">
+                            {{ 'PASS' if r.passed else 'REVIEW' }}
+                        </span>
+                    </td>
+
+                    <td>{{ r.reason }}</td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    <p class="notice">
+        Decision:
+        <strong>{{ claim.decision }}</strong>.
+
+        Passing eligibility checks does not
+        authorise automatic payment.
+    </p>
+
+
+    <!-- HUMAN REVIEW STEP -->
+    {% if claim.status == 'HUMAN_REVIEW' %}
+
+        {% if all_rules_passed %}
+
+            <h3>Human approval review</h3>
+
+            <p>
+                All six eligibility checks passed.
+                An authorised demo operator must
+                verify the supporting evidence
+                before continuing.
+            </p>
+
+            <form
+                method="post"
+                action="{{ url_for('complete_review', claim_id=claim.id) }}"
+            >
+
+                <button class="btn" type="submit">
+                    Complete human review
+                </button>
+
+            </form>
+
+        {% else %}
+
+            <p class="notice">
+                Human review required.
+                Correct the evidence and rerun
+                the eligibility checks.
+            </p>
+
+        {% endif %}
+
+    {% endif %}
+
+
+    <!-- PAYOUT AUTHORISATION -->
+    {% if claim.status == 'ELIGIBLE_REVIEW'
+          and all_rules_passed %}
+
+        <h3>Demo payout authorisation</h3>
+
+        <p>
+            Human review has been completed.
+            This claim is eligible for
+            demo payout queue authorisation.
+        </p>
+
+        <form
+            method="post"
+            action="{{ url_for('approve', claim_id=claim.id) }}"
+        >
+
+            <button class="btn" type="submit">
+                Authorise demo payout queue
+            </button>
+
+        </form>
+
+    {% endif %}
+
+
+    <!-- PAYOUT COMPLETED -->
+    {% if claim.status == 'PAYOUT_QUEUED' %}
+
+        <p class="notice">
+            Demo payout successfully queued.
+            No real money has been transferred.
+        </p>
+
+    {% endif %}
+
+</section>
+
+{% endif %}
+
+
+<!-- PAYOUT REFERENCE -->
+{% if claim.payout_reference %}
+
+<section class="panel">
+
+    <h2>Demo payout queued</h2>
+
+    <p>
+        Reference:
+        <strong>{{ claim.payout_reference }}</strong>
+    </p>
+
+    <p>
+        This is an academic demonstration.
+        No real funds are transferred.
+    </p>
+
+</section>
+
+{% endif %}
+
+
+<!-- AUDIT HISTORY -->
+<section class="panel">
+
+    <div class="section-title">
+
+        <h2>Audit history</h2>
+
+        {% if claim.status != 'PAYOUT_QUEUED' %}
+
+        <form
+            method="post"
+            action="{{ url_for('request_review', claim_id=claim.id) }}"
+        >
+
+            <button class="btn secondary" type="submit">
+                Request human review
+            </button>
+
+        </form>
+
+        {% endif %}
+
+    </div>
+
+    <div class="scroll">
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Event</th>
+                    <th>Detail</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for a in audit %}
+
+                <tr>
+                    <td>{{ a.at }}</td>
+                    <td>{{ a.event }}</td>
+                    <td class="audit">{{ a.detail }}</td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+{% endblock %}
