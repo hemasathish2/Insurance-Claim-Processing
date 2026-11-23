@@ -1,0 +1,11 @@
+pipeline {
+  agent any
+  stages {
+    stage('Checkout') { steps { checkout scm } }
+    stage('Install') { steps { sh 'python3 -m pip install -r requirements.txt' } }
+    stage('Static Checks') { steps { sh 'python3 -m compileall -q app.py claim_rules.py' } }
+    stage('Unit and Integration Tests') { steps { sh 'python3 -m pytest -q tests' } }
+    stage('Docker Build') { steps { sh 'docker build -t case17-claims:demo .' } }
+  }
+  post { always { echo 'Case 17 demo pipeline completed. Review results before deployment.' } }
+}
