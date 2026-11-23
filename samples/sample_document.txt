@@ -1,0 +1,7 @@
+SYNTHETIC SAMPLE DOCUMENT - NOT REAL INSURANCE EVIDENCE
+Claimant: Demo Claimant
+Policy: POL-TEST-08
+Category: Vehicle
+Amount: INR 12,500
+Incident: 2026-10-12
+Document type: Repair estimate
